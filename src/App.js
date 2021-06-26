@@ -46,7 +46,7 @@ const Description = styled.div`
   margin-bottom: 30px;
 `;
 
-const CurrentWeather = styled.div`
+const WeatherElement = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -124,7 +124,6 @@ const Refresh = styled.div`
     ${'' /* 判斷是否套用動畫isLoading為true才旋轉 */}
 `;
 
-// 定義深/淺主題css樣式
 const theme = {
   light: {
     backgroundColor: '#ededed',
@@ -144,25 +143,23 @@ const theme = {
     textColor: '#cccccc',
   },
 };
-// emotion套件，可以修改原本元件的樣子
-// const 元件新名字=styled(舊元件名)`css樣式`
+
+//  emotion套件，可以修改原本元件的樣子 const元件新名字=styled(舊元件名)css樣式
 const DayCloudy = styled(DayCloudyIcon)`
   flex-basis: 30%;
 `;
 
-// 中央氣象局授權碼
-const AUTHORIZATION_KEY = 'CWB-8A85A7A7-8AAB-4ADD-9CA0-F1569953C2C0';
-const LOCATION_NAME = '臺北';
-
 function App() {
   const [currentTheme, setCurrentTheme] = useState('light');
-  const [currentWeather, setCurrentWeather] = useState({
-    locationName: '臺北市',
-    description: '多雲時晴',
-    windSpeed: 1.1,
-    temperature: 22.9,
-    rainPossibility: 48.3,
-    observationTime: '2020-12-12 22:10:00',
+  const [weatherElement, setWeatherElement] = useState({
+    locationName: '',
+    description: '',
+    windSpeed: 0,
+    temperature: 0,
+    rainPossibility: 0,
+    observationTime: new Date(),
+    comfortability: '',
+    weatherCode: 0,
     isLoading: true,
     // loading狀態
   });
@@ -174,14 +171,18 @@ function App() {
     rainPossibility,
     observationTime,
     isLoading,
-  } = currentWeather;
+    comfortability,
+  } = weatherElement;
 
-  // fetchCurrentWeather函式呼叫中央氣象局API
+  // 中央氣象局授權碼
+  const AUTHORIZATION_KEY = 'CWB-8A85A7A7-8AAB-4ADD-9CA0-F1569953C2C0';
+  const LOCATION_NAME = '臺北';
+  // fetchWeatherElement函式呼叫中央氣象局API
   const fetchCurrentWeather = () => {
-    // setCurrentWeather不只可以改變資料，還可以取得改變前的資料，慣例將前一次的資料取名為prevState
-    setCurrentWeather((prevState) => ({ ...prevState, isLoading: true }));
+    // setWeatherElement不只可以改變資料，還可以取得改變前的資料，慣例將前一次的資料取名為prevState
+    setWeatherElement((prevState) => ({ ...prevState, isLoading: true }));
 
-    fetch(
+    return fetch(
       `https://opendata.cwb.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${AUTHORIZATION_KEY}&locationName=${LOCATION_NAME}`
     )
       .then((response) => {
@@ -199,21 +200,59 @@ function App() {
           },
           {}
         );
-        setCurrentWeather({
+        return setWeatherElement((prevState) => ({
+          ...prevState,
           observationTime: locationData.time.observationTime,
           locationName: locationData.locationName,
           temperature: weatherElements.TEMP,
-          winSpeed: weatherElements.WDSD,
-          description: '多雲時晴',
-          rainPossibility: 60,
+          windSpeed: weatherElements.WDSD,
           isLoading: false,
           // 拉完資料後將loading改為false
-        });
+        }));
+      });
+  };
+
+  const LOCATION_NAME_FORECAST = '臺北市';
+  const fetchWeatherForecast = () => {
+    return fetch(
+      `https://opendata.cwb.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=${AUTHORIZATION_KEY}&locationName=${LOCATION_NAME_FORECAST}`
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        const locationData = data.records.location[0];
+        const weatherElements = locationData.weatherElement.reduce(
+          (neededElements, item) => {
+            if (['Wx', 'PoP', 'CI'].includes(item.elementName)) {
+              neededElements[item.elementName] = item.time[0].parameter;
+            }
+            return neededElements;
+          },
+          {}
+        );
+        return setWeatherElement((prevState) => ({
+          ...prevState,
+          description: weatherElements.Wx.parameterName,
+          weatherCode: weatherElements.Wx.parameterValue,
+          rainPossibility: weatherElements.PoP.parameterName,
+          comfortability: weatherElements.CI.parameterName,
+        }));
       });
   };
   // 頁面載入時就呼叫API拉新資料
   useEffect(() => {
-    fetchCurrentWeather();
+    const fetchData = async () => {
+      setWeatherElement((prevState) => ({ ...prevState, isLoading: true }));
+      const [currentWeather, weatherForecast] = await Promise.all([
+        fetchCurrentWeather(),
+        fetchWeatherForecast(),
+      ]);
+      setWeatherElement({
+        ...currentWeather,
+        ...weatherForecast,
+        isLoading: false,
+      });
+    };
+    fetchData();
   }, []);
 
   return (
@@ -224,23 +263,29 @@ function App() {
         <Container>
           <WeatherCard>
             <Location theme='dark'>{locationName}</Location>
-            <Description>{description}</Description>
-            <CurrentWeather>
+            <Description>
+              {description}
+              {comfortability}
+            </Description>
+            <WeatherElement>
               <Temperature>
                 {/* Math.round()，做四捨五入 */}
                 {Math.round(temperature)} <Celsius>°C</Celsius>
               </Temperature>
               <DayCloudy />
-            </CurrentWeather>
+            </WeatherElement>
             <AirFlow>
               <AirFlowIcon /> {windSpeed} m/h
             </AirFlow>
             <Rain>
               <RainIcon /> {rainPossibility}%
             </Rain>
-            {/* 用戶點擊重整按鈕，呼叫fetchCurrentWeather函式 */}
+            {/* 用戶點擊重整按鈕，呼叫fetchweatherElement函式 */}
             <Refresh
-              onClick={fetchCurrentWeather}
+              onClick={() => {
+                fetchCurrentWeather();
+                fetchWeatherForecast();
+              }}
               isLoading={isLoading}
               // 將loading資料狀態帶入component中
             >
