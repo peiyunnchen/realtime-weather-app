@@ -6,6 +6,8 @@ import { ThemeProvider } from '@emotion/react';
 import { getMoment } from './utils/helpers';
 import WeatherCard from './views/WeatherCard';
 import useWeatherAPI from './hooks/useWeatherAPI';
+import WeatherSetting from './views/WeatherSetting';
+import { findLocation } from './utils/helpers';
 
 // 使用emotion套件建立styled Component
 const Container = styled.div`
@@ -38,30 +40,39 @@ const theme = {
 };
 
 function App() {
+  const [currentTheme, setCurrentTheme] = useState('light');
+  // 定義畫面顯示狀態，好讓畫面進行切換
+  const [currentPage, setCurrentPage] = useState('WeatherCard');
+  // 把修改頁面狀態的方法包在函式裡，再利用props傳給子元件WeatherCard
+  const handleCurrentPageChange = (currentPage) => {
+    setCurrentPage(currentPage);
+  };
+  // 若localStorage有值就拿，沒有就預設臺北市
+  const storageCity = localStorage.getItem('cityName') || '臺北市';
+  // 定義當前的城市，把localStorage的值設為預設
+  const [currentCity, setCurrentCity] = useState(storageCity);
+  // 取得當前的locationname，使用useMemo，當currentCity沒改變時不用重新call findLocation函式
+  const currentLocation = useMemo(
+    () => findLocation(currentCity),
+    [currentCity]
+  );
+  // 再利用解構賦值取currentLocation資料
+  const { cityName, locationName, sunriseCityName } = currentLocation;
+  // 把setCurrentCity包在函式中props給子元件
+  const handleCurrentCityChange = (currentCity) => {
+    setCurrentCity(currentCity);
+  };
+
   // 中央氣象局授權碼
   const AUTHORIZATION_KEY = 'CWB-8A85A7A7-8AAB-4ADD-9CA0-F1569953C2C0';
-  const LOCATION_NAME = '臺北';
-  const LOCATION_NAME_FORECAST = '臺北市';
-  const moment = useMemo(() => getMoment(LOCATION_NAME_FORECAST), []);
+  // const LOCATION_NAME = '臺北';
+  // const LOCATION_NAME_FORECAST = '臺北市';
+  const moment = useMemo(() => getMoment(sunriseCityName), [sunriseCityName]);
   const [weatherElement, fetchData] = useWeatherAPI({
-    locationName: LOCATION_NAME,
-    cityName: LOCATION_NAME_FORECAST,
+    locationName,
+    cityName,
     authorizationKey: AUTHORIZATION_KEY,
   });
-
-  const [currentTheme, setCurrentTheme] = useState('light');
-  const {
-    locationName,
-    description,
-    windSpeed,
-    temperature,
-    rainPossibility,
-    observationTime,
-    isLoading,
-    comfortability,
-    weatherCode,
-  } = weatherElement;
-
   // moment改變時主題才會變
   useEffect(() => {
     setCurrentTheme(moment === 'day' ? 'light' : 'dark');
@@ -73,11 +84,25 @@ function App() {
       {/* 把主題色帶入 */}
       <ThemeProvider theme={theme[currentTheme]}>
         <Container>
-          <WeatherCard
-            weatherElement={weatherElement}
-            moment={moment}
-            fetchData={fetchData}
-          />
+          {/* 當current狀態為WeatherCard時，就顯示weatherCard */}
+          {/* &&前面為true，執行後面動作 */}
+          {currentPage === 'WeatherCard' && (
+            <WeatherCard
+              cityName={cityName}
+              weatherElement={weatherElement}
+              moment={moment}
+              fetchData={fetchData}
+              handleCurrentPageChange={handleCurrentPageChange}
+            />
+          )}
+          {/* 當current狀態為WeatherSetting時，就顯示WeatherSetting */}
+          {currentPage === 'WeatherSetting' && (
+            <WeatherSetting
+              cityName={cityName}
+              handleCurrentPageChange={handleCurrentPageChange}
+              handleCurrentCityChange={handleCurrentCityChange}
+            />
+          )}
         </Container>
       </ThemeProvider>
     </>

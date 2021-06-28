@@ -6,6 +6,7 @@ import { ReactComponent as AirFlowIcon } from './../images/airFlow.svg';
 import { ReactComponent as RefreshIcon } from './../images/refresh.svg';
 import { ReactComponent as LoadingIcon } from './../images/loading.svg';
 import WeatherIcon from './../components/WeatherIcon';
+import { ReactComponent as CogIcon } from './../images/cog.svg';
 
 const WeatherCardWrapper = styled.div`
   position: relative;
@@ -110,10 +111,25 @@ const Refresh = styled.div`
     ${'' /* 判斷是否套用動畫isLoading為true才旋轉 */}
 `;
 
-const WeatherCard = ({ weatherElement, moment, fetchData }) => {
+const Cog = styled(CogIcon)`
+  position: absolute;
+  top: 30px;
+  right: 15px;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+`;
+
+//從props中取出handleCurrentPageChange
+const WeatherCard = ({
+  weatherElement,
+  moment,
+  fetchData,
+  handleCurrentPageChange,
+  cityName,
+}) => {
   const {
     observationTime,
-    locationName,
     temperature,
     windSpeed,
     description,
@@ -126,7 +142,8 @@ const WeatherCard = ({ weatherElement, moment, fetchData }) => {
   return (
     <>
       <WeatherCardWrapper>
-        <Location theme='light'>{locationName}</Location>
+        <Cog onClick={() => handleCurrentPageChange('WeatherSetting')} />
+        <Location theme='light'>{cityName}</Location>
         <Description>
           {description}
           {comfortability}
